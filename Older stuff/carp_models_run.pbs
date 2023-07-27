@@ -1,0 +1,19 @@
+#!/bin/bash
+ 
+#PBS -l select=1:ncpus=4:mem=10gb
+#PBS -l walltime=48:00:00
+#PBS -j oe
+#PBS -J 1-9
+#PBS -M h.schilling@unsw.edu.au
+#PBS -m abe
+
+cd $HOME
+
+module purge
+
+module load gcc/7.5.0
+module load R/4.0.2-gcc7
+export R_LIBS_USER=$HOME/R/x86_64-pc-linux-gnu-library/R-4.0.2-gcc7
+
+Rscript carp_katana_script.R
+

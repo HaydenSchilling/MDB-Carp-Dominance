@@ -1,0 +1,24 @@
+{
+    "id": "1424C403",
+    "path": "~/Carp biomass/Scripts/Carp_full_MDB_short.R",
+    "project_path": "Scripts/Carp_full_MDB_short.R",
+    "type": "r_source",
+    "hash": "649262107",
+    "contents": "",
+    "dirty": false,
+    "created": 1690415960426.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1682309319,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1682309319,
+    "read_only": false,
+    "read_only_alternatives": []
+}
