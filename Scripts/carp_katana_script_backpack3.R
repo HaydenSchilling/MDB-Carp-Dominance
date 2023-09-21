@@ -9,8 +9,8 @@ i
 paste("This is job number",i)
 # for(i in 1:nrow(rivers)){
 
-catch <- read_csv("clean boat and backpack electro catch with waterbody.csv") %>% # filter(Method == "Boat Electrofishing")
-  mutate(project_segment = paste0(ProjectName,":",SegmentName)) %>% distinct() %>% filter(WaterbodyName == rivers$Rivers[i])
+catch <- read.csv("clean waterbody_catch_11_08_2023_with_fixed_WRPA.csv") %>% # filter(Method == "Boat Electrofishing")
+  mutate(project_segment = paste0(ProjectName,":",SegmentName)) %>% distinct()# %>% filter(WaterbodyName == rivers$Rivers[i])
 
 segments <- catch %>% distinct(project_segment) %>% arrange(project_segment)
 
@@ -20,10 +20,20 @@ bad_list <- c("Edward-Wakool Blackwater restocking:NETTING AND EXTRA E FISHING",
               "Lachlan Carp Demo:GCS - YOY CARP", "Murray Cod Slot Limit Assessment:2019/Extra",
               "Murray Cod Slot Limit Assessment:2020/Extra")
 
-catch <- catch %>% filter(!project_segment %in% bad_list) %>% filter(Method == "BTE" |Method == "BPE") %>% select(-1,-2,-3,-project_segment) %>%
+bad2 <- segments %>% filter(grepl("*Extra*",project_segment)) 
+bad3 <- segments %>% filter(grepl("*Selective*",project_segment))# all extra and selective fishing
+
+catch <- catch %>% filter(!project_segment %in% bad_list) %>% 
+  filter(!project_segment %in% bad2$project_segment) %>%
+  filter(!project_segment %in% bad3$project_segment) %>%
+  filter(Method == "BTE" |Method == "BPE") %>% 
+  select(-1,-2,-3,-project_segment) %>%
   distinct()
 
-bio <- read_csv("All bio_27_01_2022.csv") %>% mutate(CalcWeight = 10^(a)*Length_mm^b)
+ab <- read_csv("Data/a b values.csv")
+
+bio <- read_csv("../../Murray cod recruitment/All bio_11_08_2023.csv")  %>% left_join(ab) %>%
+  mutate(CalcWeight = 10^(a)*Length_mm^b)
 
 bio_summary <- bio %>% group_by(CommonName, OperationID) %>%
   summarise(biomass_mean = mean(CalcWeight, na.rm=T))
@@ -73,7 +83,7 @@ catch2_wide <- catch2_wide %>% filter(Total_percent == 1) %>%
 #                                `Common carp` == 0 ~ 0.000000001,
 #                                T ~ `Common carp`),
 
-#write_csv(catch2_wide, "formatted wide catch data with backpack.csv")
+write_csv(catch2_wide, "Data/2023 formatted wide catch data with backpack.csv")
 
 n_distinct(catch2_wide$SiteID)
 tempt <- catch2_wide %>% mutate(events = paste(SampleDate, SiteID))
@@ -118,6 +128,6 @@ f2 <- brm(Response ~ fYear + Method+ (1|FDate) + (1|SiteID), #  (1|MethodType)
           seed = 1234,
           cores=4,
           file_refit = "always",
-          file = paste0("fixed backpack ",rivers$Rivers[i]," day site random.rds"))
+          file = paste0("2023 fixed backpack ",rivers$Rivers[i]," day site random.rds"))
 
 # }

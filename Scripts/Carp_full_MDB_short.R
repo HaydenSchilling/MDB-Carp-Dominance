@@ -2,8 +2,8 @@
 library(tidyverse)
 library(lubridate)
 
-#all_data <- read.csv("../Long term abundance/All e-catch_30_11_2022_WRPA_fixed.csv") %>% mutate(project_segment = paste0(ProjectName,":",SegmentName))
-all_data <- read.csv("All e-catch_30_11_2022_WRPA_fixed.csv") %>% mutate(project_segment = paste0(ProjectName,":",SegmentName))
+#all_data <- read.csv("../../Murray cod recruitment/All_catch_11_08_2023_with_fixed_WRPA.csv") %>% mutate(project_segment = paste0(ProjectName,":",SegmentName))
+all_data <- read.csv("clean waterbody_catch_11_08_2023_with_fixed_WRPA.csv") %>% mutate(project_segment = paste0(ProjectName,":",SegmentName))
 
 
 segments <- all_data %>% distinct(project_segment) %>% arrange(project_segment)
@@ -13,8 +13,15 @@ bad_list <- c("Edward-Wakool Blackwater restocking:NETTING AND EXTRA E FISHING",
               "Koondrook Perricoota Accumulation Sites:2015", "Koondrook Perricoota Accumulation Sites:2016",
               "Lachlan Carp Demo:GCS - YOY CARP", "Murray Cod Slot Limit Assessment:2019/Extra",
               "Murray Cod Slot Limit Assessment:2020/Extra")
+
+bad2 <- segments %>% filter(grepl("*Extra*",project_segment)) # all extra fishing
+bad3 <- segments %>% filter(grepl("*Selective*",project_segment)) # all extra fishing
+
 #all_data
-all_data <- all_data %>% filter(!project_segment %in% bad_list) %>% select(-1,-2,-3,-project_segment) %>%
+all_data <- all_data %>% filter(!project_segment %in% bad_list) %>% 
+  filter(!project_segment %in% bad2$project_segment) %>%
+  filter(!project_segment %in% bad3$project_segment) %>%
+  select(-1,-2,-3,-project_segment) %>%
   distinct() %>%
   filter(Method == "BTE"| Method == "BPE")
 
@@ -35,7 +42,7 @@ all_data <- all_data %>% #filter(CommonName == "Golden perch") %>%
   filter(SWWRPANAME_NEW %in% basins)
 
 
-elevation_dat <- read_csv("Site elevations.csv")
+elevation_dat <- read_csv("Data/Site elevations.csv") %>% rename(SampleLongitude = coords.x1, SampleLatitude = coords.x2)
 all_data <- all_data %>% left_join(elevation_dat) %>% filter(elevation <= 700) %>% select(-elevation, -elev_units)
 
 # 
@@ -54,10 +61,15 @@ all_data <- all_data %>% left_join(elevation_dat) %>% filter(elevation <= 700) %
 # 
 # catch <- catch %>% filter(!project_segment %in% bad_list) %>% filter(Method == "BTE") %>% select(-1,-2,-3,-project_segment) %>%
 #   distinct()
+# 
+# 
+# b2 <- read_csv("data/All bio_27_01_2022.csv") %>% select(CommonName, a, b) %>% distinct()
+# write_csv(b2, "Data/a b values.csv")
 
+ab <- read_csv("Data/a b values.csv")
 
-
-bio <- read_csv("All bio_27_01_2022.csv") %>% mutate(CalcWeight = 10^(a)*Length_mm^b)
+bio <- read_csv("../../Murray cod recruitment/All bio_11_08_2023.csv")  %>% left_join(ab) %>%
+  mutate(CalcWeight = 10^(a)*Length_mm^b)
 
 bio_summary <- bio %>% group_by(CommonName, OperationID) %>%
   summarise(biomass_mean = mean(CalcWeight, na.rm=T))
@@ -95,18 +107,23 @@ catch2_wide <- catch2_wide %>% filter(Total_percent == 1) %>%
   mutate(Year_ending_June = case_when(Month < 7 ~ Year,
                                       T ~ Year + 1),
           fYear = as.factor(as.character(Year_ending_June)))%>%
-  filter(fYear != "1992") %>% filter(fYear != "1993") %>% filter(fYear != "1994") %>% filter(fYear!=2023)
+  filter(fYear != "1992") %>% filter(fYear != "1993") %>% filter(fYear != "1994") %>% filter(fYear!=2024)
 # mutate(`Common carp` = case_when(`Common carp` == 1 ~ 0.999999999,
 #                                `Common carp` == 0 ~ 0.000000001,
 #                                T ~ `Common carp`))
 
 table(catch2_wide$Method)
 
-#write_csv(catch2_wide, "Formatted catch wide efish with backpack.csv")
+#write_csv(catch2_wide, "Formatted catch wide efish with backpack 2023.csv")
 
 # n_distinct(catch2_wide$SiteID)
 # tempt <- catch2_wide %>% mutate(events = paste(SampleDate, SiteID))
 # n_distinct(tempt$events)
+# 
+# dd <- all_data %>% dplyr::select(OperationID, ProjectName, SamplingRecordID) %>% distinct()
+# proj_dat <- catch2_wide %>% distinct(.keep_all = T) %>% left_join(dd) %>% group_by(ProjectName) %>%
+#   summarise(n_distinct(SamplingRecordID))
+# write_csv(proj_dat, "Projects in carp analysis.csv")
 
 # 
 # library(glmmTMB)
@@ -124,6 +141,14 @@ table(catch2_wide$Method)
 # library(DHARMa)
 # resids <- simulateResiduals(f2)
 # plot(resids)
+
+
+dat_sum <- catch2_wide %>% group_by(Method) %>% summarise(n=n_distinct(OperationID))
+dat_sum
+
+dat_sum2 <- catch2_wide %>% ungroup() %>% summarise(sites=n_distinct(SiteID), events = n_distinct(SamplingRecordID))
+dat_sum2
+
 
 
 
@@ -146,3 +171,38 @@ f2 <- brm(Response ~ fYear + Method + (1|FDate) + (1|SiteID) + (1|SWWRPANAME_NEW
           cores=4,
           file_refit = "always",
           file = "Carp full MDB WRPA day site random with backpack.rds")
+
+
+f2 <- readRDS("Katana results/Backpack/Carp full MDB WRPA day site random with backpack.rds")
+
+pp_check(f2, nsamples = 100)
+
+library(DHARMa)
+check_brms <- function(model,             # brms model
+                       integer = FALSE,   # integer response? (TRUE/FALSE)
+                       plot = TRUE,       # make plot?
+                       ...                # further arguments for DHARMa::plotResiduals 
+) {
+  
+  mdata <- brms::standata(model)
+  if (!"Y" %in% names(mdata))
+    stop("Cannot extract the required information from this brms model")
+  
+  dharma.obj <- DHARMa::createDHARMa(
+    simulatedResponse = t(brms::posterior_predict(model, ndraws = 1000)),
+    observedResponse = mdata$Y, 
+    fittedPredictedResponse = apply(
+      t(brms::posterior_epred(model, ndraws = 1000, re.form = NA)),
+      1,
+      mean),
+    integerResponse = integer)
+  
+  if (isTRUE(plot)) {
+    plot(dharma.obj, ...)
+  }
+  
+  invisible(dharma.obj)
+  
+}
+
+model2.check <- check_brms(f2, integer = F)

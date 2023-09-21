@@ -3,36 +3,36 @@ library(tidyverse)
 library(brms)
 library(scales)
 
-rivers <- read_csv("Rivers.csv")
-SRA_data <- read_csv("SRA alien biomass estimates.csv")
-full_dat <- read_csv("formatted wide catch data with backpack.csv") %>%
+rivers <- read_csv("Data/Rivers.csv")
+#SRA_data <- read_csv("Data/SRA alien biomass estimates.csv")
+full_dat <- read_csv("Data/2023 formatted wide catch data with backpack.csv") %>%
   mutate(fYear = as.factor(as.character(fYear)) ) %>% filter(fYear != "1992") %>%
-  filter(fYear != "1993") %>% filter(fYear != "1994")
+  filter(fYear != "1993") %>% filter(fYear != "1994") %>% filter(fYear != "2024")
 full_dat$Response <- full_dat$`Common carp`
 full_dat$Response2 <- full_dat$`Murray cod`
 full_dat$FDate <- as.factor(as.character(full_dat$Date))
 full_dat$SiteID <- as.factor(as.character(full_dat$SiteID))
 
 big_data <- data.frame()
-SRA_final_df <- data.frame()
+#SRA_final_df <- data.frame()
 ss <- full_dat %>% group_by(WaterbodyName) %>% summarise(mean_val = mean(Response),
                                                          median_val = median(Response))
 
-### Barwon River = 9, Castlereagh=5, Macquarie = 4, Darling = 2, gwydir = 8, Lachlan = 6,
-### Murrumbidgee = 7 (bad fit), Namoi = 3, Murray = 1
+### Barwon River = 9 (good), Castlereagh=5 (good), Macquarie = 4 (good), Darling = 2 (good), gwydir = 8 (good), Lachlan = 6 (good),
+### Murrumbidgee = 7 (good fit), Namoi = 3 (good), Murray = 1 (good)
 for(i in 1:nrow(rivers)){
   
-  #i=6
+  #i=1
   
-  barwon <- read_rds(paste0("Katana results/Backpack/fixed backpack ",rivers$Rivers[i]," day site random.rds"))
+  barwon <- read_rds(paste0("Katana results/Backpack/2023 fixed backpack ",rivers$Rivers[i]," day site random.rds"))
   summary(barwon) # Well mixed - good model
   #plot(barwon)
 pp_check(barwon, ndraws = 500) + theme(panel.background = element_rect(fill="white"),
                                        plot.background = element_rect(fill="white"))
 ggsave(paste0("Katana results/Backpack/posterior predictive check fixed backpack ",rivers$Rivers[i]," .png"))
   b_dat <- full_dat %>% filter(WaterbodyName == rivers$Rivers[i]) 
-  if(i == 7){
-    b_dat <- b_dat %>% filter(fYear != 1996) %>% filter(fYear !=2002)}
+  #if(i == 7){
+   # b_dat <- b_dat %>% filter(fYear != 1996) %>% filter(fYear !=2002)}
   table(b_dat$fYear)
   # table(b_dat$Method)
   # n_distinct(b_dat$SiteID)
@@ -52,13 +52,6 @@ ggsave(paste0("Katana results/Backpack/posterior predictive check fixed backpack
   # make predictions
   library(tidybayes)
   #yy <- new_data %>% add_epred_draws(f2)
-  SRA_est <- NULL
-  SRA_est <- SRA_data %>% filter(Valley == rivers$Rivers[i]) %>% mutate(year = 2008) 
-  SRA_est <- SRA_est %>%
-    add_row(Valley = rivers$Rivers[i], upper95=SRA_est$upper95[1], lower95=SRA_est$lower95[1], 
-            mean=SRA_est$mean[1], year = 2009)%>%
-    add_row(Valley = rivers$Rivers[i], upper95=SRA_est$upper95[1], lower95=SRA_est$lower95[1], 
-            mean=SRA_est$mean[1], year = 2010)
   ### important to drop levels below
   #mydata_wide$SWWRPANAME_NEW <- droplevels(mydata_wide$SWWRPANAME_NEW)
   yy <- barwon %>% epred_draws(newdata = expand_grid(fYear = levels(droplevels(b_dat$fYear)),
@@ -70,14 +63,12 @@ ggsave(paste0("Katana results/Backpack/posterior predictive check fixed backpack
                                ndraws=2000) %>%
     mutate(Species = "Common carp", River = rivers$Rivers[i])
   
-  write_csv(yy, paste0("Katana results/Backpack/Fixed Backpack ",rivers$Rivers[i]," carp annual prediction biomass.csv"))
+  write_csv(yy, paste0("Katana results/Backpack/2023 Fixed Backpack ",rivers$Rivers[i]," carp annual prediction biomass.csv"))
   big_data <- big_data %>% bind_rows(yy)
   #SRA_final_df <- SRA_final_df %>% bind_rows(SRA_est)
   
   ggplot(yy, aes(x=as.numeric(fYear))) +# facet_wrap(~SWWRPANAME_NEW, scales = "free") +
-    #geom_line(data=SRA_est, aes(x=year, y = mean*100), col = "darkgreen")+
-    #geom_ribbon(data=SRA_est, aes(x=year, ymin = lower95*100, ymax=upper95*100), fill = "green", alpha=0.2)+
-    stat_halfeye(aes(y= .epred*100), alpha=0.25) + theme_classic() +
+        stat_halfeye(aes(y= .epred*100), alpha=0.25) + theme_classic() +
     #geom_rug(data=mydata_wide)+
     theme(axis.title = element_text(face="bold", size = 14),
           axis.text = element_text(size=12, colour="black"),
@@ -118,25 +109,11 @@ ggsave(paste0("Katana results/Backpack/Fixed backpack Supplementary all river ti
 library(tidyverse)
 library(brms)
 
-rivers <- read_csv("Rivers.csv")
-
-full_dat <- read_csv("Formatted catch wide efish with backpack.csv") %>%
-  mutate(fYear = as.factor(as.character(fYear)) ) %>% filter(fYear != "1992") %>%
-  filter(fYear != "1993") %>% filter(fYear != "1994")
-full_dat$Response <- full_dat$`Common carp`
-full_dat$Response2 <- full_dat$`Murray cod`
-full_dat$FDate <- as.factor(as.character(full_dat$Date))
-full_dat$SiteID <- as.factor(as.character(full_dat$SiteID))
-
-### Barwon River = 9, Castlereagh=5, Macquarie = 4, Darling = 2, gwydir = 8, Lachlan = 6,
-### Murrumbidgee = 7 (bad fit), Namoi = 3, Murray = 1 (bad fit)
-i=1
-
 barwon <- read_rds(paste0("Katana results/Backpack/Carp full MDB WRPA day site random with backpack.rds"))
 summary(barwon) # Well mixed - good model
 #plot(barwon)
 
-b_dat <- full_dat %>% filter(fYear != 2023)
+
 
 # make predictions
 library(tidybayes)
@@ -144,7 +121,7 @@ library(tidybayes)
 
 ### important to drop levels below
 #mydata_wide$SWWRPANAME_NEW <- droplevels(mydata_wide$SWWRPANAME_NEW)
-yy <- barwon %>% epred_draws(newdata = expand_grid(fYear = levels(droplevels(b_dat$fYear)),
+yy <- barwon %>% epred_draws(newdata = expand_grid(fYear = (as.character(c(1995, 1996, seq(1998,2023,1)))),
                                                      Method = "BTE"),
                              #days_since = seq(0, max(mydata_wide$days_since), by = 50),
                              #SWWRPANAME_NEW = levels(droplevels(mydata_wide$SWWRPANAME_NEW)),
@@ -187,17 +164,23 @@ mean(dat_sum$median)
 
 ### exploring other predictions
 
-b_dat <- full_dat %>% filter(fYear != 2023)
+b_dat <- full_dat %>% filter(fYear != 2024)
 
 # make predictions
 library(tidybayes)
 #yy <- new_data %>% add_epred_draws(f2)
 library(scales)
 ### important to drop levels below
+
+basins <- c("Barwon-Darling Watercourse", "Gwydir", "Intersecting Streams",
+            "Lachlan", "Macquarie-Castlereagh", "Murrumbidgee", "Namoi", 
+            "New South Wales Border Rivers", "New South Wales Murray",
+            "New South Wales Lower Darling")
+
 #mydata_wide$SWWRPANAME_NEW <- droplevels(mydata_wide$SWWRPANAME_NEW)
-yy <- barwon %>% epred_draws(newdata = expand_grid(fYear = levels(droplevels(b_dat$fYear)),
+yy <- barwon %>% epred_draws(newdata = expand_grid(fYear = (as.character(c(1995, 1996, seq(1998,2023,1)))),
                                                    Method = "BTE",
-                                                   SWWRPANAME_NEW = unique(b_dat$SWWRPANAME_NEW)),
+                                                   SWWRPANAME_NEW = basins),
                              #days_since = seq(0, max(mydata_wide$days_since), by = 50),
                              #SWWRPANAME_NEW = levels(droplevels(mydata_wide$SWWRPANAME_NEW)),
                              #Sampling_duration = 90,
@@ -222,6 +205,9 @@ ggplot(yy, aes(x=SWWRPANAME_NEW)) +# facet_wrap(~SWWRPANAME_NEW, scales = "free"
 #geom_smooth(aes(y= .epred*100))+
 
 ggsave("Katana results/WRPA carp biomass.png",
+       dpi=600, width=21, height=14.8, units="cm")
+
+ggsave("Katana results/WRPA carp biomass.pdf",
        dpi=600, width=21, height=14.8, units="cm")
 
 ### Annual by WRPA
@@ -274,7 +260,7 @@ library(tidyverse)
 library(brms)
 library(scales)
 
-rivers <- read_csv("Rivers.csv")
+rivers <- read_csv("Data/Rivers.csv")
 
 full_dat <- read_csv("Biomass proportions by SampleRecordID river level.csv") %>%
   mutate(fYear = as.factor(as.character(fYear)) )%>% filter(fYear != "1992") %>%
@@ -309,7 +295,9 @@ full_dat <- full_dat %>% mutate(WaterbodyName = case_when(WaterbodyName  == "Dar
                                                           T ~ WaterbodyName))
 
 
-ggplot(full_dat, aes(Response)) + geom_histogram(aes(y = stat(density) * 10) ,binwidth=0.1)+ 
+ggplot(full_dat, aes(Response)) + geom_histogram(aes(y = stat(density) * 10) ,
+                                                 breaks = c(0,.10,.20,.30,.40,.50,.60,.70,.80,.90,1.01),
+                                                 closed="left")+ 
   facet_wrap(~WaterbodyName, ncol=2)+ theme_bw()+
   #geom_vline(data = sample_size2, aes(xintercept=mean_carp), col="blue")+
   #geom_vline(data = sample_size2, aes(xintercept=median_carp), col="red")+
@@ -327,18 +315,14 @@ ggsave(paste0("Katana results/survey histograms all rivers.pdf"), dpi=600, width
 
 ### Basin scale histogram
 
-rivers <- read_csv("Rivers.csv")
+rivers <- read_csv("Data/Rivers.csv")
 
 full_dat <- read_csv("Biomass proportions by SampleRecordID basin level.csv") %>%
   mutate(fYear = as.factor(as.character(fYear)) )%>% filter(fYear != "1992") %>%
-  filter(fYear != "1993") %>% filter(fYear != "1994") %>% filter(fYear != "2023")
+  filter(fYear != "1993") %>% filter(fYear != "1994") %>% filter(fYear != "2024")
 
 
-all_data <- read.csv("../Long term abundance/All e-catch_30_11_2022_WRPA_fixed.csv") %>% 
-  select(SiteID, coords.x1, coords.x2) %>% distinct()
-
-elevation_dat <- read_csv("Site elevations.csv") %>% left_join(all_data)
-full_dat <- full_dat %>% left_join(elevation_dat) %>% filter(elevation <= 700) %>% select(-elevation, -elev_units)
+#full_dat <- full_dat %>% left_join(elevation_dat) %>% filter(elevation <= 700) %>% select(-elevation, -elev_units)
 
 
 full_dat$Response <- full_dat$`Common carp`
@@ -405,6 +389,9 @@ datdat <- dat_sum %>% pivot_wider(values_from = Proportion, names_from = value) 
          large = `Greater than 90%`)
 f2 <- brm(large ~ Year, data = datdat, family = "beta")
 summary(f2)
+
+
+
 #plot(ggeffects::ggpredict(f2))
 library(tidybayes)
 zz <- f2 %>% epred_draws(newdata = expand_grid(Year = seq(min(datdat$Year),max(datdat$Year),0.05)),
@@ -438,3 +425,6 @@ ggplot(dat_sum, aes(Year, Proportion, col=value,fill=value, size=total_surveys),
 ggsave("Proportion carp top bottom over time.png", dpi=600, width = 20, height=15, units="cm")  
 ggsave("Proportion carp top bottom over time.pdf", dpi=600, width = 20, height=15, units="cm")  
 
+data_extract <- zzzz %>% group_by(Year, value) %>% summarise(quantile = scales::percent(c(0.025, 0.5, 0.975)),
+                                                       estimate = quantile(.epred, c(0.025, 0.5, 0.975))) %>%
+  pivot_wider(names_from = quantile, values_from = estimate)
