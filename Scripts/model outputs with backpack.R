@@ -3,11 +3,15 @@ library(tidyverse)
 library(brms)
 library(scales)
 
+site_dets <- read_csv("Data/2023 formatted wide catch data with backpack.csv") %>%
+  select(WaterbodyName, SiteID) %>% distinct()
+
 rivers <- read_csv("Data/Rivers.csv")
 #SRA_data <- read_csv("Data/SRA alien biomass estimates.csv")
-full_dat <- read_csv("Data/2023 formatted wide catch data with backpack.csv") %>%
+full_dat <- read_csv("Data/2024 Formatted by survey.csv") %>%
   mutate(fYear = as.factor(as.character(fYear)) ) %>% filter(fYear != "1992") %>%
-  filter(fYear != "1993") %>% filter(fYear != "1994") %>% filter(fYear != "2024")
+  filter(fYear != "1993") %>% filter(fYear != "1994") %>% filter(fYear != "2024") %>%
+  left_join(site_dets)
 full_dat$Response <- full_dat$`Common carp`
 full_dat$Response2 <- full_dat$`Murray cod`
 full_dat$FDate <- as.factor(as.character(full_dat$Date))
@@ -24,12 +28,12 @@ for(i in 1:nrow(rivers)){
   
   #i=1
   
-  barwon <- read_rds(paste0("Katana results/Backpack/2023 fixed backpack ",rivers$Rivers[i]," day site random.rds"))
+  barwon <- read_rds(paste0("Katana results/2024 site level backpack ",rivers$Rivers[i]," day site random.rds"))
   summary(barwon) # Well mixed - good model
   #plot(barwon)
 pp_check(barwon, ndraws = 500) + theme(panel.background = element_rect(fill="white"),
                                        plot.background = element_rect(fill="white"))
-ggsave(paste0("Katana results/Backpack/posterior predictive check fixed backpack ",rivers$Rivers[i]," .png"))
+ggsave(paste0("Katana results/Backpack/2024 posterior predictive check fixed backpack ",rivers$Rivers[i]," .png"))
   b_dat <- full_dat %>% filter(WaterbodyName == rivers$Rivers[i]) 
   #if(i == 7){
    # b_dat <- b_dat %>% filter(fYear != 1996) %>% filter(fYear !=2002)}
@@ -63,7 +67,7 @@ ggsave(paste0("Katana results/Backpack/posterior predictive check fixed backpack
                                ndraws=2000) %>%
     mutate(Species = "Common carp", River = rivers$Rivers[i])
   
-  write_csv(yy, paste0("Katana results/Backpack/2023 Fixed Backpack ",rivers$Rivers[i]," carp annual prediction biomass.csv"))
+  write_csv(yy, paste0("Katana results/Backpack/2024 Fixed Backpack ",rivers$Rivers[i]," carp annual prediction biomass.csv"))
   big_data <- big_data %>% bind_rows(yy)
   #SRA_final_df <- SRA_final_df %>% bind_rows(SRA_est)
   
@@ -76,7 +80,7 @@ ggsave(paste0("Katana results/Backpack/posterior predictive check fixed backpack
     #geom_smooth(aes(y= .epred*100))+
     ylab("Predicted Biomass Carp (%)") + xlab("Year ending June") +
     ggtitle(rivers$Rivers[i])
-  ggsave(paste0("Katana results/Backpack/Fixed Backpack ",rivers$Rivers[i]," time series.png"),
+  ggsave(paste0("Katana results/Backpack/2024 Backpack ",rivers$Rivers[i]," time series.png"),
          dpi=600, width=21, height=14.8, units="cm")
   
 }
@@ -99,17 +103,23 @@ ggplot(big_data, aes(x=as.numeric(fYear))) + facet_wrap(~River, ncol=2) +
   #geom_smooth(aes(y= .epred*100))+
   ylab("Predicted Biomass Carp (%)") + xlab("Year ending June")# +
 #ggtitle(rivers$Rivers[i])
-ggsave(paste0("Katana results/Backpack/Fixed backpack Supplementary all river time series BTE.png"),
+ggsave(paste0("Katana results/Backpack/2024 Fixed backpack Supplementary all river time series BTE.png"),
        dpi=600, width=21, height=14.8*2, units="cm")
-ggsave(paste0("Katana results/Backpack/Fixed backpack Supplementary all river time series BTE.pdf"),
+ggsave(paste0("Katana results/Backpack/2024 Fixed backpack Supplementary all river time series BTE.pdf"),
        dpi=600, width=21, height=14.8*2, units="cm")
+write_csv(big_data,"Katana results/2024 combined river estimates full.csv")
 
+big_data <- read_csv("Katana results/2024 combined river estimates full.csv")
+river_sum <- big_data %>% group_by(River) %>%
+  summarise(median_carp = median(.epred))
+river_sum2 <- big_data %>% group_by(River, fYear) %>%
+  summarise(median_carp = median(.epred)) %>% arrange(River, fYear)
 
 ### Overall MDB
 library(tidyverse)
 library(brms)
 
-barwon <- read_rds(paste0("Katana results/Backpack/Carp full MDB WRPA day site random with backpack.rds"))
+barwon <- read_rds(paste0("Testing_Sampling_level.rds"))
 summary(barwon) # Well mixed - good model
 #plot(barwon)
 
@@ -130,7 +140,7 @@ yy <- barwon %>% epred_draws(newdata = expand_grid(fYear = (as.character(c(1995,
                              re_formula =NA) %>%
   mutate(Species = "Common carp")
 
-write_csv(yy, paste0("Katana results/Backpack/Overall MDB carp annual prediction biomass.csv"))
+write_csv(yy, paste0("Katana results/Backpack/2024 Overall MDB carp annual prediction biomass.csv"))
 
 
 ggplot(yy, aes(x=as.numeric(fYear))) +# facet_wrap(~SWWRPANAME_NEW, scales = "free") +
@@ -150,7 +160,7 @@ ggsave(paste0("Katana results/Overall MDB carp biomass time series.pdf"),
        dpi=600, width=21, height=14.8, units="cm")
 
 
-yy <- read_csv("Katana results/Backpack/Overall MDB carp annual prediction biomass.csv")
+yy <- read_csv("Katana results/Backpack/2024 Overall MDB carp annual prediction biomass.csv")
 dat_sum <- yy %>% group_by(fYear) %>% summarise(quantile = scales::percent(c(0.025, 0.5, 0.975)),
                                                 estimate = quantile(.epred, c(0.025, 0.5, 0.975))) %>%
   pivot_wider(names_from = quantile, values_from = estimate)
@@ -160,7 +170,7 @@ dat_sum <- yy %>% group_by(fYear) %>% summarise(quantile = scales::percent(c(0.0
 dat_sum
 
 quantile(yy$.epred, probs = c(0.025,0.5, 0.975))
-mean(dat_sum$median)
+#mean(dat_sum$median)
 
 ### exploring other predictions
 
@@ -188,8 +198,11 @@ yy <- barwon %>% epred_draws(newdata = expand_grid(fYear = (as.character(c(1995,
                              re_formula = ~(1|SWWRPANAME_NEW)) %>%
   mutate(Species = "Common carp")
 
-write_csv(yy, paste0("Katana results/Backpack/Overall MDB carp annual prediction biomass WRPAs.csv"))
+write_csv(yy, paste0("Katana results/Backpack/2024 Overall MDB carp annual prediction biomass WRPAs.csv"))
 
+dat_sum <- yy %>% group_by(SWWRPANAME_NEW) %>% summarise(quantile = scales::percent(c(0.025, 0.5, 0.975)),
+                                                estimate = quantile(.epred, c(0.025, 0.5, 0.975))) %>%
+  pivot_wider(names_from = quantile, values_from = estimate)
 
 ggplot(yy, aes(x=SWWRPANAME_NEW)) +# facet_wrap(~SWWRPANAME_NEW, scales = "free") +
   stat_halfeye(aes(y= .epred*100), alpha=0.25) + theme_classic() +
@@ -204,15 +217,15 @@ ggplot(yy, aes(x=SWWRPANAME_NEW)) +# facet_wrap(~SWWRPANAME_NEW, scales = "free"
         axis.ticks = element_line(colour="black"))
 #geom_smooth(aes(y= .epred*100))+
 
-ggsave("Katana results/WRPA carp biomass.png",
+ggsave("Katana results/2024 WRPA carp biomass.png",
        dpi=600, width=21, height=14.8, units="cm")
 
-ggsave("Katana results/WRPA carp biomass.pdf",
+ggsave("Katana results/2024WRPA carp biomass.pdf",
        dpi=600, width=21, height=14.8, units="cm")
 
 ### Annual by WRPA
 
-b_dat <- full_dat %>% filter(fYear != 2023)
+b_dat <- full_dat %>% filter(fYear != 2024)
 
 # make predictions
 library(tidybayes)
@@ -252,7 +265,7 @@ ggplot(yy, aes(x=as.numeric(fYear))) + facet_wrap(~SWWRPANAME_NEW, ncol=2) +
 ggsave("Katana results/WRPA carp biomass Annual.png",
        dpi=600, width=21, height=14.8*2, units="cm")
 
-wrpa_sum <- yy %>% group_by(SWWRPANAME_NEW, fYear) %>% summarise(median_est = median (.epred))
+wrpa_sum <- yy %>% group_by(SWWRPANAME_NEW) %>% summarise(median_est = median (.epred))
 wrpa_sum
 
 #### Histograms at samplerecordID level (not shot/Operation)
@@ -338,6 +351,8 @@ sample_size <- full_dat %>% group_by(fYear) %>%
 
 b_dat <- full_dat #%>% filter(WaterbodyName == rivers$Rivers[i]) 
 
+
+
 ggplot(b_dat, aes(Response)) + geom_histogram(aes(y = stat(density) * 10) ,
                                               breaks = c(0,.10,.20,.30,.40,.50,.60,.70,.80,.90,1.01),
                                               closed="left")+ 
@@ -355,6 +370,14 @@ ggsave(paste0("Katana results/survey histograms overall2.png"), dpi=600, width =
 ggsave(paste0("Katana results/survey histograms overall2.pdf"), dpi=600, width = 21, height=14.8, units="cm")
 
 
+
+XXXX <- b_dat %>% group_by(fYear) %>%
+  summarise(Median = median(Response, na.rm=T),
+            Mean = mean(Response, na.rm=T))
+
+xxx2 <- XXXX %>% pivot_longer(cols=2:3, values_to = "value", names_to = "metric") %>%
+  mutate(Year = as.numeric(as.character(fYear)))
+ggplot(xxx2, aes(Year, value, colour = metric)) + geom_point()+ geom_smooth(method="lm")
 
 
 #### Plot showing change over time

@@ -10,7 +10,9 @@ paste("This is job number",i)
 # for(i in 1:nrow(rivers)){
 
 catch <- read.csv("clean waterbody_catch_11_08_2023_with_fixed_WRPA.csv") %>% # filter(Method == "Boat Electrofishing")
-  mutate(project_segment = paste0(ProjectName,":",SegmentName)) %>% distinct()# %>% filter(WaterbodyName == rivers$Rivers[i])
+  mutate(project_segment = paste0(ProjectName,":",SegmentName)) %>% distinct() %>% filter(WaterbodyName == rivers$Rivers[i])
+
+site_dets <- all_data %>% select(SiteName, SiteID) %>% distinct()
 
 segments <- catch %>% distinct(project_segment) %>% arrange(project_segment)
 
@@ -41,13 +43,24 @@ bio_summary <- bio %>% group_by(CommonName, OperationID) %>%
 catch2 <- catch %>% left_join(bio_summary) %>% mutate(Taxa_biomass = biomass_mean * NumberCaught)
 
 catch_total_biomass <- catch2  %>%
-  ungroup() %>% group_by(OperationID) %>%
+  ungroup() %>% group_by(SamplingRecordID) %>%
   summarise(Total_biomass = sum(Taxa_biomass, na.rm=T))
 
-catch2 <- catch2 %>% left_join(catch_total_biomass)
+# method change
+meths <- catch2 %>% select(SamplingRecordID, Method) %>% distinct() %>%
+  group_by(SamplingRecordID) %>% summarise(method_N =n())
+table(meths$method_N)
 
-catch2 <- catch2 %>% mutate(Biomass_proportion = Taxa_biomass/Total_biomass) %>%
-  select(SampleDate, SiteID, CommonName, OperationID, Method, Biomass_proportion, WaterbodyName)
+catch2 <- catch2 %>% left_join(meths) %>% mutate(Method = case_when(method_N == 2 ~ "Hybrid",
+                                                                    T ~ Method)) %>%
+  select(-method_N)
+
+catch2 <- catch2 %>% select(SampleDate, SiteID,SWWRPANAME_NEW, CommonName, SamplingRecordID, Method,Taxa_biomass) %>% # ,Total_biomass, Biomass_proportion
+  group_by(SampleDate, SiteID,SWWRPANAME_NEW, CommonName, SamplingRecordID, Method) %>%
+  summarise(Taxa_biomass = sum(Taxa_biomass, na.rm=T)) %>% ungroup() %>% left_join(catch_total_biomass) %>%
+  filter(Total_biomass >0) %>% mutate(Biomass_proportion = Taxa_biomass/Total_biomass) %>%
+  select(SampleDate, SiteID,SWWRPANAME_NEW, CommonName, SamplingRecordID, Method,Taxa_biomass,Total_biomass, Biomass_proportion)
+
 
 # yy <- catch2 %>%
 #   dplyr::group_by(SampleDate, SiteID, OperationID, Method, CommonName) %>%
@@ -55,6 +68,9 @@ catch2 <- catch2 %>% mutate(Biomass_proportion = Taxa_biomass/Total_biomass) %>%
 #   dplyr::filter(n > 1L)
 # hist(yy$SampleDate, breaks = "years")
 # xx <- catch %>% filter(OperationID %in% yy$OperationID)
+
+catch2 <- catch2 %>%# mutate(Biomass_proportion = Taxa_biomass/Total_biomass) %>%
+  select(SampleDate, SiteID,SWWRPANAME_NEW, CommonName, SamplingRecordID, Method, Biomass_proportion)
 
 catch2_wide <- catch2 %>% ungroup() %>%
   pivot_wider(names_from = CommonName, values_from = Biomass_proportion, values_fn = sum) %>%
@@ -83,7 +99,7 @@ catch2_wide <- catch2_wide %>% filter(Total_percent == 1) %>%
 #                                `Common carp` == 0 ~ 0.000000001,
 #                                T ~ `Common carp`),
 
-write_csv(catch2_wide, "Data/2023 formatted wide catch data with backpack.csv")
+#write_csv(catch2_wide, "Data/2023 formatted wide catch data with backpack.csv")
 
 n_distinct(catch2_wide$SiteID)
 tempt <- catch2_wide %>% mutate(events = paste(SampleDate, SiteID))
@@ -119,7 +135,7 @@ table(catch2_wide$Response)
 priors <- c(set_prior("student_t(3, 0, 2.5)", class = "Intercept"),
             set_prior("normal(0, 1)", class = "b"))
 
-f2 <- brm(Response ~ fYear + Method+ (1|FDate) + (1|SiteID), #  (1|MethodType)
+f2 <- brm(Response ~ fYear + (1|Method) + (1|FDate) + (1|SiteID), #  (1|MethodType)
           data = catch2_wide, family = zero_one_inflated_beta(),
 
           #prior = priors,
@@ -128,6 +144,6 @@ f2 <- brm(Response ~ fYear + Method+ (1|FDate) + (1|SiteID), #  (1|MethodType)
           seed = 1234,
           cores=4,
           file_refit = "always",
-          file = paste0("2023 fixed backpack ",rivers$Rivers[i]," day site random.rds"))
+          file = paste0("2024 site level backpack ",rivers$Rivers[i]," day site random.rds"))
 
 # }
